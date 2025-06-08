@@ -1,0 +1,28 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Dependências - MUITO IMPORTANTE
+node_modules/
+dist/
+dist-ssr/
+.pnp.*
+
+# Cache de Build do Next.js - MUITO IMPORTANTE
+.next/
+out/
+
+# Arquivos de Sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de ambiente (contém senhas e chaves)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
