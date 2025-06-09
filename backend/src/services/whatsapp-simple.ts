@@ -66,7 +66,7 @@ export class WhatsAppService {
 
   private updateStatus(status: WhatsAppClientStatus['status'], message?: string, qrDataURL?: string) {
     this.currentStatus = status;
-    const statusPayload: WhatsAppClientStatus = { status, message, wid: this.client.info?.wid };
+    const statusPayload: WhatsAppClientStatus = { status, message, wid: this.client.info?.wid?._serialized };
     if (qrDataURL) statusPayload.qrDataURL = qrDataURL;
     
     this.io.emit("status_update", statusPayload); // Emitir um evento de status genérico
@@ -165,7 +165,7 @@ export class WhatsAppService {
   public getStatus(): WhatsAppClientStatus {
     return {
         status: this.currentStatus,
-        wid: this.client.info?.wid,
+        wid: this.client.info?.wid?._serialized,
         // Para simplificar, não vamos gerar a URL do QR aqui, o frontend deve usar o qrDataURL emitido.
         message: this.currentStatus === 'qr' && this.currentQrCode ? 'Escaneie o QR Code' : `Status atual: ${this.currentStatus}`
     };

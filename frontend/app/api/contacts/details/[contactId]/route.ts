@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // Nova rota proxy para buscar detalhes de um contato específico
 import { type NextRequest, NextResponse } from "next/server"
 

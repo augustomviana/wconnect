@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 // Renomeando frontend/app/api/auth/route.ts para frontend/app/api/auth/proxy/route.ts
 // para evitar conflito com a pasta /auth do backend se estivessem no mesmo nível de proxy reverso.
 // E para ser mais explícito sobre sua função.

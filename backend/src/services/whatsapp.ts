@@ -46,6 +46,7 @@ export const initWhatsAppService = async (): Promise<WhatsAppService> => {
     puppeteer: {
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
       headless: true,
+      executablePath: '/root/.cache/puppeteer/chrome/linux-137.0.7151.55/chrome-linux64/chrome'
     },
   })
 
