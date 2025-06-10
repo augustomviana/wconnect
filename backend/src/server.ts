@@ -32,37 +32,30 @@ const io = new Server(server, {
   },
 });
 
-// 🛡️ Corrige problema do Express com proxies (rate-limit)
-app.set("trust proxy", true);
+// ======================= INÍCIO DA VERSÃO DEFINITIVA =======================
 
+// 🛡️ Informa ao Express que ele está atrás de um proxy. Essencial para o rate-limit.
+// Deve vir antes dos middlewares que dependem disso.
+app.set("trust proxy", 1); 
 
+// 1. Configuração de CORS robusta e flexível para produção.
 const allowedOrigins = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
-  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL || 'http://185.217.126.180:3000', // Adiciona o IP do seu VPS como padrão
   ...(process.env.ALLOWED_ORIGINS?.split(",") || [])
-].filter(Boolean) as string[];
+].filter(Boolean) as string[]; // Filtra valores nulos/undefined e garante que é um array de strings
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     const environment = process.env.NODE_ENV || "development";
 
-    if (!origin) return callback(null, true);
-
-    const isAllowed = allowedOrigins.some((allowed) =>
-      origin.startsWith(allowed)
-    );
-
-    if (isAllowed) {
+    // Permite requisições sem origem (ex: Postman, apps mobile) ou se a origem estiver na lista.
+    if (!origin || allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
       callback(null, true);
     } else {
-      if (environment === "development") {
-        console.warn(`⚠️ [CORS] Origem não permitida, mas aceita em DEV: ${origin}`);
-        callback(null, true);
-      } else {
-        console.error(`⛔ [CORS] Origem BLOQUEADA: ${origin}`);
-        callback(new Error("Não permitido pela política de CORS"));
-      }
+      console.error(`⛔ [CORS] Origem BLOQUEADA: ${origin}`);
+      callback(new Error("Não permitido pela política de CORS"));
     }
   },
   credentials: true,
@@ -70,14 +63,12 @@ const corsOptions: cors.CorsOptions = {
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 };
 
-// Aplicar CORS primeiro
+// 2. Aplicar o middleware CORS ANTES do Helmet. Esta é a correção de ordem.
 app.use(cors(corsOptions));
 
-
-// Segurança HTTP
+// 3. Aplicar outros middlewares de segurança e de parse.
 app.use(helmet());
 
-// Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -86,11 +77,11 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Payload parsing
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// ======================== FIM DA VERSÃO DEFINITIVA =========================
 
-// Database
+
 const dbService = new DatabaseService();
 
 // Rotas da aplicação
@@ -109,8 +100,7 @@ app.get("/health", async (req, res) => {
   try {
     await dbService.query("SELECT 1");
     const whatsappService = getWhatsAppService();
-    const whatsappStatus = whatsappService ? "ready" : "not_ready";
-
+    const whatsappStatus = whatsappService?.isReady ? "ready" : "not_ready";
     res.json({
       status: "OK",
       timestamp: new Date().toISOString(),
@@ -118,12 +108,7 @@ app.get("/health", async (req, res) => {
       whatsapp: whatsappStatus,
     });
   } catch (error) {
-    res.status(500).json({
-      status: "ERROR",
-      timestamp: new Date().toISOString(),
-      database: "disconnected",
-      whatsapp: "not_ready"
-    });
+    res.status(500).json({ status: "ERROR", database: "disconnected" });
   }
 });
 
@@ -157,15 +142,12 @@ const startServer = async () => {
     console.log("🚀 Iniciando servidor...");
     await dbService.query("SELECT NOW()");
     console.log("✅ Banco de dados conectado");
-
     try {
       console.log("📱 Inicializando WhatsApp Service...");
       await initWhatsAppService();
-      console.log("✅ WhatsApp Service iniciado");
     } catch (error) {
       console.error("⚠️ WhatsApp Service não pôde ser iniciado:", error);
     }
-
     server.listen(PORT, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
     });
@@ -178,4 +160,3 @@ const startServer = async () => {
 startServer();
 
 export { app, io };
-
