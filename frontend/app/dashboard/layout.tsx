@@ -302,24 +302,102 @@ export default function DashboardLayout({
 
         {/* Mobile Navigation */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
-          <div className="flex justify-around py-2">
-            {navigation.slice(0, 5).map((route) => (
-              <a
-                key={route.href}
-                href={route.href}
-                className={`flex flex-col items-center p-2 text-xs ${
-                  isActive(route.href) ? "text-green-600" : "text-gray-600"
-                }`}
-              >
-                <route.icon className="h-5 w-5 mb-1" />
-                <span className="truncate">{route.name}</span>
-              </a>
-            ))}
+          <div className="grid grid-cols-5 gap-1 py-2 px-2">
+            {/* Primeira linha - 5 itens principais */}
+            <a
+              href="/dashboard"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname === "/dashboard" ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <Home className="h-4 w-4 mb-1" />
+              <span className="truncate">Dashboard</span>
+            </a>
+            <a
+              href="/dashboard/conversations"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/conversations") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <MessageSquare className="h-4 w-4 mb-1" />
+              <span className="truncate">Conversas</span>
+            </a>
+            <a
+              href="/dashboard/contacts"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/contacts") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <Users className="h-4 w-4 mb-1" />
+              <span className="truncate">Contatos</span>
+            </a>
+            <a
+              href="/dashboard/whatsapp"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/whatsapp") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <MessageSquare className="h-4 w-4 mb-1" />
+              <span className="truncate">WhatsApp</span>
+            </a>
+            <a
+              href="/dashboard/chatbot"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/chatbot") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <Bot className="h-4 w-4 mb-1" />
+              <span className="truncate">Chatbot</span>
+            </a>
+          </div>
+
+          {/* Segunda linha - 4 itens + botão sair */}
+          <div className="grid grid-cols-5 gap-1 py-1 px-2 border-t border-gray-100">
+            <a
+              href="/dashboard/members"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/members") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <Users className="h-4 w-4 mb-1" />
+              <span className="truncate">Membros</span>
+            </a>
+            <a
+              href="/dashboard/integrations"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/integrations") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <Zap className="h-4 w-4 mb-1" />
+              <span className="truncate">Integrações</span>
+            </a>
+            <a
+              href="/dashboard/settings"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/settings") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <Settings className="h-4 w-4 mb-1" />
+              <span className="truncate">Config.</span>
+            </a>
+            <a
+              href="/dashboard/profile"
+              className={`flex flex-col items-center p-2 text-xs ${
+                pathname.includes("/profile") ? "text-green-600" : "text-gray-600"
+              }`}
+            >
+              <User className="h-4 w-4 mb-1" />
+              <span className="truncate">Perfil</span>
+            </a>
+            <button onClick={handleLogout} className="flex flex-col items-center p-2 text-xs text-red-600">
+              <LogOut className="h-4 w-4 mb-1" />
+              <span className="truncate">Sair</span>
+            </button>
           </div>
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 lg:p-6 pb-20 lg:pb-6">{children}</main>
+        <main className="flex-1 p-4 lg:p-6 pb-32 lg:pb-6">{children}</main>
       </div>
     </div>
   )
