@@ -1,6 +1,11 @@
 #!/bin/bash
 
-echo "🗄️ Configurando Banco de Dados PostgreSQL"
+# --- Variáveis com as configurações corretas do seu .env ---
+DB_NAME="whatsapp_db"
+DB_USER="whatsapp_user"
+DB_PASS="romanos1"
+
+echo "🗄️  Configurando Banco de Dados PostgreSQL"
 echo "=========================================="
 
 # Verificar se PostgreSQL está instalado
@@ -10,14 +15,14 @@ if ! command -v psql &> /dev/null; then
     sudo apt install postgresql postgresql-contrib -y
 fi
 
-# Configurar banco
+# Configurar banco com as variáveis corretas
 echo "🔧 Configurando banco de dados..."
-sudo -u postgres createdb whatsapp_web 2>/dev/null || echo "✅ Banco já existe"
-sudo -u postgres createuser whatsapp_user 2>/dev/null || echo "✅ Usuário já existe"
-sudo -u postgres psql -c "ALTER USER whatsapp_user PASSWORD 'sua_senha';" 2>/dev/null
+sudo -u postgres createdb ${DB_NAME} 2>/dev/null || echo "✅ Banco '${DB_NAME}' já existe."
+sudo -u postgres createuser ${DB_USER} 2>/dev/null || echo "✅ Usuário '${DB_USER}' já existe."
+sudo -u postgres psql -c "ALTER USER ${DB_USER} WITH PASSWORD '${DB_PASS}';"
 
-# Schema SQL
-cat > database/schema.sql << 'EOF'
+# Schema SQL Corrigido (com a tabela chatbots)
+cat > database/schema.sql << 'SQL_EOF'
 -- Criação das tabelas
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -56,16 +61,24 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Tabela que estava faltando --
+CREATE TABLE IF NOT EXISTS chatbots (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_messages_from_contact ON messages(from_contact);
 CREATE INDEX IF NOT EXISTS idx_contacts_whatsapp_id ON contacts(whatsapp_id);
-EOF
+SQL_EOF
 
-# Executar schema
-sudo -u postgres psql -d whatsapp_web -f database/schema.sql
+# Executar schema no banco correto
+sudo -u postgres psql -d ${DB_NAME} -f database/schema.sql
 
 echo "✅ Banco de dados configurado!"
-echo "📊 Banco: whatsapp_web"
-echo "👤 Usuário: whatsapp_user"
-echo "🔑 Senha: sua_senha"
+echo "📊 Banco: ${DB_NAME}"
+echo "👤 Usuário: ${DB_USER}"

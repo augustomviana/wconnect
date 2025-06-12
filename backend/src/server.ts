@@ -40,7 +40,8 @@ app.set("trust proxy", 1);
 
 // 1. Configuração de CORS robusta e flexível para produção.
 const allowedOrigins = [
-  "http://localhost:3000",
+ 'https://wconnect.repagil.com.br',
+ "http://localhost:3000",
   "http://127.0.0.1:3000",
   process.env.FRONTEND_URL || 'http://185.217.126.180:3000', // Adiciona o IP do seu VPS como padrão
   ...(process.env.ALLOWED_ORIGINS?.split(",") || [])

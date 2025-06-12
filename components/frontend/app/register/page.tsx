@@ -21,24 +21,17 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/auth/proxy", {
-        // Usaremos uma rota proxy no frontend
+      // ===== CORREÇÃO APLICADA AQUI =====
+      const response = await fetch("/api/auth/register", { // URL corrigida
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "register", name, email, password }),
+        body: JSON.stringify({ name, email, password }), // Corpo da requisição corrigido
       })
+      // ===================================
 
       const data = await response.json()
 
       if (response.ok && data.user) {
-        // Opcional: logar automaticamente e redirecionar para o dashboard
-        // if (data.token) {
-        //   localStorage.setItem("authToken", data.token);
-        //   localStorage.setItem("userData", JSON.stringify(data.user));
-        //   router.push("/dashboard");
-        // } else {
-        //   router.push("/login?registered=true"); // Redireciona para login com mensagem de sucesso
-        // }
         alert("Registro bem-sucedido! Faça login para continuar.")
         router.push("/login")
       } else {
