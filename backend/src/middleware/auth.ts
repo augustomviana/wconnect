@@ -1,20 +1,6 @@
+import * as jwt from "jsonwebtoken"
 import type { Request, Response, NextFunction } from "express"
-import jwt from "jsonwebtoken"
-
-// Interface para o payload do JWT
-interface JwtPayload {
-  userId: string
-  email: string
-}
-
-// Estender a interface Request para incluir user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JwtPayload
-    }
-  }
-}
+import type { CustomJwtPayload } from "../types/express"
 
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -24,8 +10,12 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
       return res.status(401).json({ error: "Token de acesso requerido" })
     }
 
-    const jwtSecret = process.env.JWT_SECRET || "your-secret-key"
-    const decoded = jwt.verify(token, jwtSecret) as JwtPayload
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key") as CustomJwtPayload
+
+    // Garantir que o token decodificado tem as propriedades necessárias
+    if (!decoded.id || !decoded.email) {
+      return res.status(401).json({ error: "Token inválido" })
+    }
 
     req.user = decoded
     next()
