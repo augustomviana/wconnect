@@ -1,10 +1,10 @@
 import { Client, LocalAuth, type Message as WWebMessage } from "whatsapp-web.js";
-import qrcode from "qrcode-terminal";
+import { io } from "../server";
+import qrcode from "qrcode";
 import fs from "fs";
 import path from "path";
 import { ChatbotService } from "./chatbot";
 
-// --- Interfaces e instâncias de serviço ---
 export interface WhatsAppService {
   client: Client;
   isReady: boolean;
@@ -16,107 +16,74 @@ export interface WhatsAppService {
 let whatsappService: WhatsAppService | null = null;
 let chatbotService: ChatbotService | null = null;
 
-const SESSION_DIR = path.join(process.cwd(), ".wwebjs_auth");
-if (!fs.existsSync(SESSION_DIR)) {
-  fs.mkdirSync(SESSION_DIR, { recursive: true });
-}
-
-// ======================= INÍCIO DA CORREÇÃO =======================
-// Lógica para definir as opções do Puppeteer de forma dinâmica
+const SESSION_DATA_PATH = '/tmp/wwebjs_auth_wconnect';
 
 const getPuppeteerOptions = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
   const options = {
-    headless: true,
+    headless: 'new' as const,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
+      `--user-data-dir=${SESSION_DATA_PATH}`,
       '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--single-process', // <- Este pode ajudar em ambientes com poucos recursos
       '--disable-gpu'
-    ]
+    ],
+    executablePath: '/usr/bin/google-chrome-stable',
   };
-
-  // Se estiver em produção (no VPS Linux), especifica o caminho do executável.
-  // Em desenvolvimento (Windows), deixa o Puppeteer encontrar o browser automaticamente.
-  if (isProduction) {
-    return {
-      ...options,
-      executablePath: '/root/.cache/puppeteer/chrome/linux-137.0.7151.55/chrome-linux64/chrome'
-    };
-  }
-
   return options;
 };
-// ======================== FIM DA CORREÇÃO =========================
-
 
 export const initWhatsAppService = async (): Promise<WhatsAppService> => {
-  if (whatsappService) {
-    return whatsappService;
-  }
-
-  console.log("Inicializando WhatsApp Service...");
-
-  if (!chatbotService) {
-    chatbotService = new ChatbotService();
-  }
+  if (whatsappService) { return whatsappService; }
+  console.log("🚀 INICIANDO WHATSAPP SERVICE REAL...");
+  io.emit("status_change", { status: "connecting", message: "Inicializando cliente..." });
+  if (!chatbotService) { chatbotService = new ChatbotService(); }
 
   const client = new Client({
-    authStrategy: new LocalAuth({ clientId: "whatsapp-web-system" }),
-    puppeteer: getPuppeteerOptions() // <-- USA A FUNÇÃO DINÂMICA
+    authStrategy: new LocalAuth({ clientId: "wconnect-session", dataPath: SESSION_DATA_PATH }),
+    puppeteer: getPuppeteerOptions() as any
   });
 
-  client.on("qr", (qr) => {
-    console.log("QR Code recebido, escaneie para autenticar:");
-    qrcode.generate(qr, { small: true });
-    // Salva o QR code em um arquivo para acesso via frontend
-    fs.writeFileSync(path.join(process.cwd(), "qrcode.txt"), qr);
+  client.on("qr", async (qr) => {
+    console.log("✅ QR Code REAL recebido. Enviando para o frontend.");
+    try {
+      const qrCodeUrl = await qrcode.toDataURL(qr);
+      io.emit("qr_code", qrCodeUrl);
+      io.emit("status_change", { status: "qr_code", message: "Escaneie o QR Code para conectar." });
+    } catch (err) { console.error('Falha ao gerar QR code data URL:', err); }
   });
 
   client.on("authenticated", () => {
-    console.log("WhatsApp autenticado!");
+    console.log("✅ WhatsApp autenticado!");
+    io.emit("status_change", { status: "authenticated", message: "Autenticado com sucesso." });
   });
 
   client.on("ready", () => {
-    console.log("WhatsApp Client está pronto!");
-    if (whatsappService) {
-      whatsappService.isReady = true;
-    }
+    console.log("✅ WhatsApp Client está pronto!");
+    if (whatsappService) { whatsappService.isReady = true; }
+    io.emit("status_change", { status: "connected", message: "Conectado e pronto!" });
   });
 
   client.on("disconnected", (reason) => {
-    console.log("WhatsApp desconectado:", reason);
-    if (whatsappService) {
-      whatsappService.isReady = false;
-    }
+    console.log("❌ WhatsApp desconectado:", reason);
+    if (whatsappService) { whatsappService.isReady = false; }
+    io.emit("status_change", { status: "disconnected", message: `Desconectado: ${reason}` });
   });
-
-  client.on("message", async (message: WWebMessage) => {
-    try {
-      if (message.fromMe) return;
-      console.log(`📨 Mensagem recebida de ${message.from}: ${message.body}`);
-      if (chatbotService && whatsappService?.isReady) {
-        await chatbotService.processMessage(message.from, message.body, whatsappService);
-      }
-    } catch (error) {
-      console.error("Erro ao processar mensagem no chatbot:", error);
-    }
-  });
-
-  await client.initialize().catch((err) => {
-    console.error("Erro ao inicializar WhatsApp client:", err);
+  
+  try {
+    await client.initialize();
+  } catch (err) {
+    console.error("❌ Erro CRÍTICO ao inicializar WhatsApp client:", err);
+    io.emit("status_change", { status: "disconnected", message: `Erro na inicialização: ${err}` });
     throw err;
-  });
+  }
 
   whatsappService = {
     client,
     isReady: false,
-    // ... o resto do seu objeto de serviço ...
     sendMessage: async (to, message) => {
         if (!whatsappService?.isReady) throw new Error("WhatsApp client não está pronto");
         const formattedNumber = to.includes("@c.us") ? to : `${to}@c.us`;
@@ -124,54 +91,28 @@ export const initWhatsAppService = async (): Promise<WhatsAppService> => {
     },
     getContacts: async () => {
         if (!whatsappService?.isReady) throw new Error("WhatsApp client não está pronto");
-        const contacts = await client.getContacts();
-        return contacts.map(contact => ({
-            id: contact.id._serialized,
-            name: contact.name || contact.pushname,
-            number: contact.number,
-            isGroup: contact.isGroup,
-        }));
+        return await client.getContacts();
     },
     getChats: async () => {
         if (!whatsappService?.isReady) throw new Error("WhatsApp client não está pronto");
-        const chats = await client.getChats();
-        return chats.map(chat => ({
-            id: chat.id._serialized,
-            name: chat.name,
-            isGroup: chat.isGroup,
-            unreadCount: chat.unreadCount,
-        }));
+        return await client.getChats();
     },
   };
-
   return whatsappService;
 };
 
-// ... o resto do seu ficheiro (getWhatsAppService, etc.) ...
-export const getWhatsAppService = (): WhatsAppService | null => {
-  return whatsappService;
-};
-
-export const getWhatsAppStatus = (): { isReady: boolean } => {
-  return {
-    isReady: whatsappService?.isReady || false,
-  };
-};
-
+// As outras funções de suporte
+export const getWhatsAppService = (): WhatsAppService | null => { return whatsappService; };
+export const getWhatsAppStatus = (): { isReady: boolean } => { return { isReady: whatsappService?.isReady || false, }; };
 export const restartWhatsAppService = async (): Promise<{ success: boolean; message: string }> => {
   try {
-    if (whatsappService?.client) {
-      await whatsappService.client.destroy();
-      whatsappService = null;
-    }
+    if (whatsappService?.client) { await whatsappService.client.destroy(); }
+    whatsappService = null;
     await initWhatsAppService();
     return { success: true, message: "WhatsApp Service reiniciado com sucesso" };
   } catch (error) {
-    console.error("Erro ao reiniciar WhatsApp Service:", error);
-    return { success: false, message: `Erro ao reiniciar: ${error}` };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Erro ao reiniciar WhatsApp Service:", errorMessage);
+    return { success: false, message: `Erro ao reiniciar: ${errorMessage}` };
   }
-};
-
-export const setWhatsAppService = (service: WhatsAppService) => {
-  whatsappService = service;
 };

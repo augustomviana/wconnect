@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { LogIn, Mail, Lock, Send } from "lucide-react"
+import { LogIn, Mail, Lock, Send } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -20,25 +20,26 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/auth/proxy", {
-        // Usaremos uma rota proxy no frontend
+      // ===== CORREÇÃO APLICADA AQUI =====
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "login", email, password }),
+        body: JSON.stringify({ email, password }),
       })
+      // ===================================
 
       const data = await response.json()
 
       if (response.ok && data.token) {
-        localStorage.setItem("authToken", data.token) // Armazena o token
-        localStorage.setItem("userData", JSON.stringify(data.user)) // Armazena dados do usuário
+        localStorage.setItem("authToken", data.token)
+        localStorage.setItem("userData", JSON.stringify(data.user))
         router.push("/dashboard")
       } else {
         setError(data.error || "Falha no login. Verifique suas credenciais.")
       }
     } catch (err) {
       setError("Erro ao conectar com o servidor. Tente novamente.")
-      console.error(err)
+      console.error("💥 Erro na requisição:", err)
     } finally {
       setLoading(false)
     }

@@ -1,207 +1,60 @@
-import express from "express"
-import { getWhatsAppService, getWhatsAppStatus } from "../services/whatsapp"
-import { DatabaseService } from "../services/database"
-import { authMiddleware } from "../middleware/auth"
+import express from "express";
+import { 
+  getWhatsAppService, 
+  getWhatsAppStatus, 
+  restartWhatsAppService 
+} from "../services/whatsapp";
 
-const router = express.Router()
-const dbService = new DatabaseService()
+const router = express.Router();
 
-// Get WhatsApp status (PUBLIC - sem autenticação)
+// Rota para verificar o status da conexão
 router.get("/status", (req, res) => {
-  try {
-    console.log("Requisição para /status recebida")
-    const status = getWhatsAppStatus()
-    console.log("Status retornado:", status)
-    res.json(status)
-  } catch (error) {
-    console.error("Erro ao buscar status:", error)
-    res.status(500).json({
-      error: "Erro interno do servidor",
-      details: error instanceof Error ? error.message : "Erro desconhecido",
-    })
-  }
-})
+  const status = getWhatsAppStatus();
+  res.status(200).json(status);
+});
 
-// Restart WhatsApp connection (PUBLIC - sem autenticação)
+// Rota para reiniciar o serviço do WhatsApp
 router.post("/restart", async (req, res) => {
   try {
-    console.log("Requisição para /restart recebida")
-    const whatsappService = getWhatsAppService()
-
-    if (whatsappService?.client) {
-      await whatsappService.client.destroy()
-      console.log("WhatsApp destruído, reinicializando...")
-    }
-
-    // Reinicializar será feito automaticamente pelo sistema
-    console.log("WhatsApp reinicializado com sucesso")
-
-    res.json({
-      message: "Conexão WhatsApp reiniciada",
-    })
+    const result = await restartWhatsAppService();
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Erro ao reiniciar WhatsApp:", error)
-    res.status(500).json({
-      error: "Erro interno do servidor",
-      details: error instanceof Error ? error.message : "Erro desconhecido",
-    })
+    const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+    res.status(500).json({ success: false, message: errorMessage });
   }
-})
+});
 
-// Get QR Code (PUBLIC - sem autenticação)
-router.get("/qr", (req, res) => {
-  try {
-    console.log("Requisição para /qr recebida")
-    res.json({
-      message: "QR Code será enviado via WebSocket quando gerado",
-    })
-  } catch (error) {
-    console.error("Erro ao solicitar QR:", error)
-    res.status(500).json({
-      error: "Erro interno do servidor",
-      details: error instanceof Error ? error.message : "Erro desconhecido",
-    })
-  }
-})
-
-// Get contacts from WhatsApp (PUBLIC - sem autenticação)
-router.get("/contacts", async (req, res) => {
-  try {
-    console.log("Requisição para sincronizar contatos recebida")
-    const whatsappService = getWhatsAppService()
-
-    if (!whatsappService || !whatsappService.isReady) {
-      return res.status(400).json({
-        error: "WhatsApp não está conectado",
-        message: "Conecte o WhatsApp primeiro",
-      })
+// Adicionando as rotas que estavam no arquivo original para garantir compatibilidade
+router.post('/send', async (req, res) => {
+    const { to, message } = req.body;
+    const service = getWhatsAppService();
+    if (service && service.isReady) {
+        await service.sendMessage(to, message);
+        res.status(200).json({ success: true });
+    } else {
+        res.status(503).json({ error: 'WhatsApp não está pronto' });
     }
+});
 
-    const contacts = await whatsappService.getContacts()
-    console.log(`Obtidos ${contacts.length} contatos do WhatsApp`)
-
-    let savedCount = 0
-    for (const contact of contacts) {
-      await dbService.saveContact({
-        whatsapp_id: contact.id,
-        name: contact.name,
-        phone_number: contact.number,
-        profile_pic_url: "",
-        is_group: contact.isGroup,
-      })
-      savedCount++
+router.get('/contacts', async (req, res) => {
+    const service = getWhatsAppService();
+    if (service && service.isReady) {
+        const contacts = await service.getContacts();
+        res.status(200).json(contacts);
+    } else {
+        res.status(503).json({ error: 'WhatsApp não está pronto' });
     }
+});
 
-    console.log(`Salvos ${savedCount} contatos no banco de dados`)
-
-    res.json({
-      message: "Contatos sincronizados com sucesso",
-      contacts,
-      count: contacts.length,
-    })
-  } catch (error) {
-    console.error("Erro ao buscar contatos:", error)
-    res.status(500).json({
-      error: error instanceof Error ? error.message : "Erro interno do servidor",
-      details: error instanceof Error ? error.stack : "Erro desconhecido",
-    })
-  }
-})
-
-// Get chats from WhatsApp (PUBLIC - sem autenticação)
-router.get("/chats", async (req, res) => {
-  try {
-    const whatsappService = getWhatsAppService()
-
-    if (!whatsappService || !whatsappService.isReady) {
-      return res.status(400).json({
-        error: "WhatsApp não está conectado",
-        message: "Conecte o WhatsApp primeiro",
-      })
+router.get('/chats', async (req, res) => {
+    const service = getWhatsAppService();
+    if (service && service.isReady) {
+        const chats = await service.getChats();
+        res.status(200).json(chats);
+    } else {
+        res.status(503).json({ error: 'WhatsApp não está pronto' });
     }
+});
 
-    const chats = await whatsappService.getChats()
-    res.json({
-      chats,
-    })
-  } catch (error) {
-    console.error("Erro ao buscar chats:", error)
-    res.status(500).json({
-      error: error instanceof Error ? error.message : "Erro interno do servidor",
-    })
-  }
-})
 
-// Send message (PROTEGIDO - com autenticação)
-router.post("/send", authMiddleware, async (req, res) => {
-  try {
-    const { to, message } = req.body
-    const decodedTo = decodeURIComponent(to)
-
-    console.log(
-      `[API /whatsapp/send] Recebido pedido. Original 'to': ${to}, Decodificado 'to': ${decodedTo}, mensagem: "${message}"`,
-    )
-
-    if (!to || !message) {
-      return res.status(400).json({
-        error: "Destinatário e mensagem são obrigatórios",
-      })
-    }
-
-    const whatsappService = getWhatsAppService()
-
-    if (!whatsappService || !whatsappService.isReady) {
-      return res.status(400).json({
-        error: "WhatsApp não está conectado",
-        message: "Conecte o WhatsApp primeiro",
-      })
-    }
-
-    const sentMessage = await whatsappService.sendMessage(decodedTo, message)
-
-    await dbService.saveMessage({
-      whatsapp_id: sentMessage.id._serialized,
-      from_contact: sentMessage.from,
-      to_contact: sentMessage.to,
-      message_body: message,
-      message_type: "text",
-      timestamp: sentMessage.timestamp,
-      is_group_message: false,
-    })
-
-    res.json({
-      message: "Mensagem enviada com sucesso",
-      data: {
-        id: sentMessage.id._serialized,
-        timestamp: sentMessage.timestamp,
-      },
-    })
-  } catch (error) {
-    console.error("Erro ao enviar mensagem:", error)
-    res.status(500).json({
-      error: error instanceof Error ? error.message : "Erro interno do servidor",
-    })
-  }
-})
-
-// Logout from WhatsApp (PUBLIC - sem autenticação)
-router.post("/logout", async (req, res) => {
-  try {
-    const whatsappService = getWhatsAppService()
-
-    if (whatsappService?.client) {
-      await whatsappService.client.destroy()
-    }
-
-    res.json({
-      message: "Logout do WhatsApp realizado com sucesso",
-    })
-  } catch (error) {
-    console.error("Erro ao fazer logout:", error)
-    res.status(500).json({
-      error: "Erro interno do servidor",
-    })
-  }
-})
-
-export default router
+export default router;

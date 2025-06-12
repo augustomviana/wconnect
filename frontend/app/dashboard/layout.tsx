@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   BarChart3,
+  MapPin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -50,6 +51,11 @@ const navigation: Route[] = [
     name: "WhatsApp",
     href: "/dashboard/whatsapp",
     icon: MessageSquare,
+  },
+  {
+    name: "Google Maps",
+    href: "/dashboard/gmaps-extractor",
+    icon: MapPin,
   },
   {
     name: "Chatbot",
@@ -155,6 +161,7 @@ export default function DashboardLayout({
     if (pathname.includes("/members")) return "Membros"
     if (pathname.includes("/contacts")) return "Contatos"
     if (pathname.includes("/whatsapp")) return "WhatsApp"
+    if (pathname.includes("/gmaps-extractor")) return "Google Maps Extractor"
     if (pathname.includes("/chatbot")) return "Chatbot & Automação"
     if (pathname.includes("/integrations")) return "Integrações"
     if (pathname.includes("/settings")) return "Configurações"
@@ -171,6 +178,7 @@ export default function DashboardLayout({
     if (pathname.includes("/members")) return "Gerencie membros da equipe"
     if (pathname.includes("/contacts")) return "Gerencie seus contatos do WhatsApp"
     if (pathname.includes("/whatsapp")) return "Configure e monitore sua conexão WhatsApp"
+    if (pathname.includes("/gmaps-extractor")) return "Extraia dados de empresas do Google Maps automaticamente"
     if (pathname.includes("/chatbot")) return "Gerencie chatbots, respostas automáticas e fluxos de conversa"
     if (pathname.includes("/integrations")) return "Configure integrações com sistemas externos"
     if (pathname.includes("/settings")) return "Configure as preferências do sistema"
@@ -341,13 +349,13 @@ export default function DashboardLayout({
               <span className="truncate">WhatsApp</span>
             </a>
             <a
-              href="/dashboard/chatbot"
+              href="/dashboard/gmaps-extractor"
               className={`flex flex-col items-center p-2 text-xs ${
-                pathname.includes("/chatbot") ? "text-green-600" : "text-gray-600"
+                pathname.includes("/gmaps-extractor") ? "text-green-600" : "text-gray-600"
               }`}
             >
-              <Bot className="h-4 w-4 mb-1" />
-              <span className="truncate">Chatbot</span>
+              <MapPin className="h-4 w-4 mb-1" />
+              <span className="truncate">G.Maps</span>
             </a>
           </div>
 
@@ -402,4 +410,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-/* arquivo final de novo novamente vamos */
