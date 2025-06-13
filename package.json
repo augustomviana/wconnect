@@ -84,7 +84,11 @@
   "pnpm": {
     "allowed-build-scripts": [
       "puppeteer"
+    ],
+    "onlyBuiltDependencies": [
+      "libpq",
+      "puppeteer",
+      "unrs-resolver"
     ]
   }
 }
-

@@ -1,7 +1,7 @@
 import { Client, LocalAuth, type Message as WWebMessage } from "whatsapp-web.js";
 import { io } from "../server";
 import qrcode from "qrcode";
-import fs from "fs";
+import os from "os";
 import path from "path";
 import { ChatbotService } from "./chatbot";
 
@@ -16,9 +16,13 @@ export interface WhatsAppService {
 let whatsappService: WhatsAppService | null = null;
 let chatbotService: ChatbotService | null = null;
 
-const SESSION_DATA_PATH = '/tmp/wwebjs_auth_wconnect';
+// Usando o diretório temporário do sistema operacional para maior compatibilidade
+const SESSION_DATA_PATH = path.join(os.tmpdir(), 'wwebjs_auth_wconnect');
 
 const getPuppeteerOptions = () => {
+  // Detecta a plataforma (win32 para Windows)
+  const isWindows = process.platform === 'win32';
+
   const options = {
     headless: 'new' as const,
     args: [
@@ -31,7 +35,10 @@ const getPuppeteerOptions = () => {
       '--no-zygote',
       '--disable-gpu'
     ],
-    executablePath: '/usr/bin/google-chrome-stable',
+    // Define o caminho do executável baseado no sistema operacional
+    executablePath: isWindows
+      ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+      : '/usr/bin/google-chrome-stable',
   };
   return options;
 };
@@ -72,7 +79,7 @@ export const initWhatsAppService = async (): Promise<WhatsAppService> => {
     if (whatsappService) { whatsappService.isReady = false; }
     io.emit("status_change", { status: "disconnected", message: `Desconectado: ${reason}` });
   });
-  
+
   try {
     await client.initialize();
   } catch (err) {
