@@ -1,24 +1,56 @@
+# Node modules
 node_modules/
+
+# Next.js build output
 .next/
-.wwebjs_auth/
-.wwebjs_cache/
+out/
 dist/
-*.env
+dist-ssr/
+
+# WhatsApp Web JS sessions and cache
+.wwebjs_auth/
+.wwebjs_auth_session/
+.wwebjs_cache/
+backend/wwebjs_auth_session/
+
+# Environment variables
+.env
 .env.*
+!.env.example   # permite versionar um arquivo exemplo de env
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# Dependências e Build
-dist-ssr/
+# Yarn Plug'n'Play
 .pnp.*
-out/
+.pnp.js
 
-# Arquivos de Sistema
+# System files
 .DS_Store
 Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+
+# Optional coverage directory
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Mac OS files
+.AppleDouble
+.LSOverride
+
+# Others
+*.bak
+*.backup

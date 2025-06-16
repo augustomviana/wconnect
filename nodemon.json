@@ -1,6 +1,9 @@
 {
-  "watch": ["src"],
-  "ext": "ts",
-  "ignore": ["dist"],
-  "exec": "ts-node ./src/server.ts"
+  "watch": ["backend/src"],
+  "ext": "ts,json",
+  "ignore": [
+    "backend/dist/",
+    "backend/wwebjs_auth_session/"
+  ],
+  "exec": "ts-node ./backend/src/server.ts"
 }

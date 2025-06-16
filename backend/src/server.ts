@@ -1,280 +1,93 @@
-import express from "express"
-import cors from "cors"
-import helmet from "helmet"
-import rateLimit from "express-rate-limit"
-import { createServer } from "http"
-import { Server } from "socket.io"
-import dotenv from "dotenv"
-import fs from "fs"
-import path from "path"
+// backend/src/server.ts
 
-// Routes
-import authRoutes from "./routes/auth"
-import contactRoutes from "./routes/contacts"
-import messageRoutes from "./routes/messages"
-import whatsappRoutes from "./routes/whatsapp"
-import automationRoutes from "./routes/automation"
-import chatbotRoutes from "./routes/chatbot"
-import integrationsRoutes from "./routes/integrations"
+import express from "express";
+import { createServer } from "http";
+import dotenv from "dotenv";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import path from "path";
 
-// Services
-import { initWhatsAppService, getWhatsAppService } from "./services/whatsapp"
-import { DatabaseService } from "./services/database"
+import { io } from "./io"; // Importa a instância partilhada do io
 
-dotenv.config()
+// Importa todas as suas rotas
+import authRoutes from "./routes/auth";
+import whatsappRoutes from "./routes/whatsapp";
+import contactRoutes from "./routes/contacts";
+import messageRoutes from "./routes/messages";
+import automationRoutes from "./routes/automation";
+import chatbotRoutes from "./routes/chatbot";
+import integrationsRoutes from "./routes/integrations";
+import campanhaRoutes from "./routes/campanha";
 
-const app = express()
-const server = createServer(app)
-const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    methods: ["GET", "POST"],
-  },
-})
+// Importa as funções do serviço
+import { initWhatsAppService, restartWhatsAppService } from "./services/whatsapp";
+import { DatabaseService } from "./services/database";
 
+dotenv.config();
 
-// 🛡️ Informa ao Express que ele está atrás de um proxy. Essencial para o rate-limit.
-// Deve vir antes dos middlewares que dependem disso.
-app.set("trust proxy", 1); 
+const app = express();
+const server = createServer(app);
 
-// 1. Configuração de CORS robusta e flexível para produção.
-const allowedOrigins = [
- 'https://wconnect.repagil.com.br',
- "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  process.env.FRONTEND_URL || 'http://185.217.126.180:3000', // Adiciona o IP do seu VPS como padrão
-  ...(process.env.ALLOWED_ORIGINS?.split(",") || [])
-].filter(Boolean) as string[]; // Filtra valores nulos/undefined e garante que é um array de strings
+// Ativa o servidor 'io' ligando-o ao servidor HTTP
+io.attach(server);
 
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    const environment = process.env.NODE_ENV || "development";
-
-    // Permite requisições sem origem (ex: Postman, apps mobile) ou se a origem estiver na lista.
-    if (!origin || allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
-      callback(null, true);
-    } else {
-      console.error(`⛔ [CORS] Origem BLOQUEADA: ${origin}`);
-      callback(new Error("Não permitido pela política de CORS"));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
-};
-
-// 2. Aplicar o middleware CORS ANTES do Helmet. Esta é a correção de ordem.
-app.use(cors(corsOptions));
-
-// 3. Aplicar outros middlewares de segurança e de parse.
-app.use(helmet());
-
-// Middleware
-app.use(helmet())
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    credentials: true,
-  }),
-)
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-})
-app.use(limiter)
-
-app.use(express.json({ limit: "10mb" }))
-app.use(express.urlencoded({ extended: true, limit: "10mb" }))
-
-// Test database connection
-const dbService = new DatabaseService()
-
-// Routes básicas
-app.use("/api/auth", authRoutes)
-app.use("/api/contacts", contactRoutes)
-app.use("/api/messages", messageRoutes)
-app.use("/api/whatsapp", whatsappRoutes)
-app.use("/api/automation", automationRoutes)
-app.use("/api/chatbot", chatbotRoutes)
-app.use("/api/integrations", integrationsRoutes)
-
-// Carregamento dinâmico de rotas adicionais
-const routesPath = path.join(__dirname, "routes")
-
-// Função para verificar se um arquivo de rota existe e importá-lo
-const loadRouteIfExists = async (routeName: string) => {
-  const routeFile = path.join(routesPath, `${routeName}.ts`)
-  const routeFileJs = path.join(routesPath, `${routeName}.js`)
-
-  console.log(`🔍 Verificando rota: ${routeName}`)
-  console.log(`📁 Arquivo TS: ${routeFile}`)
-  console.log(`📁 Arquivo JS: ${routeFileJs}`)
-
-  if (fs.existsSync(routeFile) || fs.existsSync(routeFileJs)) {
-    try {
-      console.log(`📥 Importando rota: ${routeName}`)
-      const route = await import(`./routes/${routeName}`)
-
-      if (!route.default) {
-        console.error(`❌ Rota ${routeName} não tem export default`)
-        return false
-      }
-
-      const routePath = `/api/${routeName.replace("-", "/")}`
-      app.use(routePath, route.default)
-      console.log(`✅ Rota carregada: ${routePath}`)
-      return true
-    } catch (error) {
-      console.error(`❌ Erro ao carregar rota ${routeName}:`, error)
-      return false
-    }
-  } else {
-    console.log(`⚠️ Arquivo de rota não encontrado: ${routeName}`)
-    return false
-  }
-}
-
-// Carregar rotas adicionais
-;(async () => {
-  console.log("🚀 Carregando rotas adicionais...")
-  await loadRouteIfExists("google-search")
-  await loadRouteIfExists("whatsapp-group")
-  await loadRouteIfExists("gmaps-extractor")
-  console.log("✅ Carregamento de rotas concluído")
-})()
-
-// Health check
-app.get("/health", async (req, res) => {
-  try {
-    // Test database connection
-    await dbService.query("SELECT 1")
-
-    const whatsappService = getWhatsAppService()
-    const whatsappStatus = whatsappService ? whatsappService.isReady : false
-
-    res.json({
-      status: "OK",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      database: "connected",
-      whatsapp: whatsappStatus ? "ready" : "not_ready",
-    })
-  } catch (error) {
-    res.status(500).json({
-      status: "ERROR",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      database: "disconnected",
-      whatsapp: "not_ready",
-      error: error instanceof Error ? error.message : "Unknown error",
-    })
-  }
-})
-
-// Test automation routes
-app.get("/api/test", (req, res) => {
-  res.json({
-    message: "Backend funcionando",
-    routes: [
-      "/api/auth",
-      "/api/contacts",
-      "/api/messages",
-      "/api/whatsapp",
-      "/api/automation",
-      "/api/chatbot",
-      "/api/integrations",
-      "/api/google/search",
-      "/api/whatsapp/group",
-      "/api/gmaps/extractor",
-    ],
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || "development",
-  })
-})
-
-// Middleware para log de todas as rotas
-app.use((req, res, next) => {
-  console.log(`📡 ${req.method} ${req.path}`)
-  next()
-})
-
-// Socket.IO connection handling
+// --- INÍCIO DA CORREÇÃO ---
+// Lógica de conexão do Socket.IO que ouve os eventos do frontend.
 io.on("connection", (socket) => {
-  console.log("Cliente conectado:", socket.id)
+  console.log(`🔌 Cliente conectado ao Socket.IO: ${socket.id}`);
+  
+  // Adiciona o ouvinte para o evento 'restart_whatsapp'
+  socket.on('restart_whatsapp', async () => {
+    console.log(`⚡ Evento 'restart_whatsapp' recebido do cliente: ${socket.id}`);
+    try {
+        await restartWhatsAppService();
+    } catch (error) {
+        console.error("Falha ao processar o reinício do WhatsApp via socket:", error);
+    }
+  });
 
   socket.on("disconnect", () => {
-    console.log("Cliente desconectado:", socket.id)
-  })
-})
+    console.log(`🔌 Cliente desconectado do Socket.IO: ${socket.id}`);
+  });
+});
+// --- FIM DA CORREÇÃO ---
 
-// Error handling
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("Erro no servidor:", err.stack)
-  res.status(500).json({
-    error: "Erro interno do servidor",
-    message: process.env.NODE_ENV === "development" ? err.message : "Algo deu errado",
-  })
-})
+// Middlewares
+app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000", credentials: true }));
+app.use(helmet());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-const PORT = process.env.PORT || 5000
+// Rotas
+app.use("/api/auth", authRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/contacts", contactRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/automation", automationRoutes);
+app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/integrations", integrationsRoutes);
+app.use("/api/campanha", campanhaRoutes);
 
-// Iniciar o servidor
+
+const PORT = process.env.PORT || 5000;
+
 const startServer = async () => {
   try {
-    console.log("🚀 Iniciando servidor...")
+    const dbService = new DatabaseService();
+    await dbService.testConnection();
+    console.log("✅ Banco de dados conectado");
 
-    // Test database on startup
-    await dbService
-      .testConnection()
-      .then(() => {
-        console.log("✅ Banco de dados conectado")
-      })
-      .catch((err) => {
-        console.error("❌ Erro ao conectar banco:", err.message)
-        // Não parar o servidor se o banco não estiver disponível
-      })
+    await initWhatsAppService();
+    console.log("✅ Serviço WhatsApp inicializado no arranque.");
 
-    // Iniciar o serviço do WhatsApp
-    try {
-      console.log("📱 Inicializando WhatsApp Service...")
-      await initWhatsAppService()
-      console.log("✅ WhatsApp Service iniciado")
-    } catch (error) {
-      console.error("⚠️ WhatsApp Service não pôde ser iniciado:", error)
-      // Continuar sem o WhatsApp por enquanto
-    }
-
-    // Iniciar o servidor
     server.listen(PORT, () => {
-      console.log(`🚀 Servidor rodando na porta ${PORT}`)
-      console.log(`📱 WhatsApp Service: ${getWhatsAppService() ? "ativo" : "inativo"}`)
-      console.log(`🤖 Sistema de Automação ativo`)
-      console.log(`🗄️ Banco de dados: ${process.env.DB_NAME}@${process.env.DB_HOST}`)
-      console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:3000"}`)
-      console.log(`📊 Health check: http://localhost:${PORT}/health`)
-      console.log(`🧪 Test endpoint: http://localhost:${PORT}/api/test`)
-
-      // Listar todas as rotas registradas
-      console.log("\n📋 Rotas registradas:")
-      app._router.stack.forEach((middleware: any) => {
-        if (middleware.route) {
-          console.log(`  ${Object.keys(middleware.route.methods).join(", ").toUpperCase()} ${middleware.route.path}`)
-        } else if (middleware.name === "router") {
-          middleware.handle.stack.forEach((handler: any) => {
-            if (handler.route) {
-              console.log(`  ${Object.keys(handler.route.methods).join(", ").toUpperCase()} ${handler.route.path}`)
-            }
-          })
-        }
-      })
-    })
+      console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    });
   } catch (error) {
-    console.error("❌ Erro ao iniciar o servidor:", error)
-    process.exit(1)
+    console.error("❌ Erro fatal ao iniciar o servidor:", error);
+    process.exit(1);
   }
-}
+};
 
-startServer()
-
-export { app, io }
+startServer();
